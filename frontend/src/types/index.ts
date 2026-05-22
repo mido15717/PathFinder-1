@@ -111,6 +111,62 @@ export type ProgressStats = {
   completedPhases: number;
 };
 
+export type LearningProgressStatus = "not_started" | "in_progress" | "completed";
+
+export type ProgressCourse = {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  relatedSkills: string[];
+  careerPathId?: string;
+  roadmapPhaseId?: string;
+  status: LearningProgressStatus;
+  progressPercentage: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  lastUpdatedAt?: string | null;
+};
+
+export type ProgressLog = {
+  id: string;
+  actionType: string;
+  entityType: string;
+  entityId?: string | null;
+  description: string;
+  oldStatus?: LearningProgressStatus | string | null;
+  newStatus?: LearningProgressStatus | string | null;
+  progressValue?: number | null;
+  createdAt: string;
+};
+
+export type RoadmapPhaseProgress = {
+  phaseId: string;
+  title: string;
+  description?: string;
+  order?: number;
+  status: LearningProgressStatus;
+  progressPercentage: number;
+  completedCourses: ProgressCourse[];
+  completedSkills: Array<{ id?: string; skillName: string; progressPercentage: number; status: LearningProgressStatus }>;
+  courses: ProgressCourse[];
+  skills: string[];
+};
+
+export type ProgressSummary = {
+  overallRoadmapProgress: number;
+  roadmapProgress: number;
+  overallProgressPercentage: number;
+  completedCoursesCount: number;
+  inProgressCoursesCount: number;
+  notStartedCoursesCount: number;
+  completedSkillsCount: number;
+  currentPhase?: RoadmapPhaseProgress | null;
+  nextRecommendedTask: string;
+  recentActivity: ProgressLog[];
+  skillsProgress: number;
+  coursesProgress: number;
+};
+
 export type SkillLevel = "Beginner" | "Intermediate" | "Advanced";
 export type SkillTrackerStatus = "Not Started" | "In Progress" | "Completed";
 export type ResourceType = "Course" | "Documentation" | "Video" | "Book" | "Practice" | "Article";

@@ -40,6 +40,24 @@ async def create_indexes(db: AsyncIOMotorDatabase) -> None:
     await db.study_plans.create_index([("user_id", ASCENDING)])
     await db.study_plans.create_index([("roadmap_id", ASCENDING)])
 
+    await db.user_learning_paths.create_index([("user_id", ASCENDING)])
+    await db.user_learning_paths.create_index([("career_path_id", ASCENDING)])
+    await db.user_learning_paths.create_index([("roadmap_id", ASCENDING)])
+    await db.user_learning_paths.create_index([("user_id", ASCENDING), ("roadmap_id", ASCENDING)], unique=True)
+
+    await db.user_course_progress.create_index([("user_id", ASCENDING)])
+    await db.user_course_progress.create_index([("course_id", ASCENDING)])
+    await db.user_course_progress.create_index([("career_path_id", ASCENDING)])
+    await db.user_course_progress.create_index([("roadmap_phase_id", ASCENDING)])
+    await db.user_course_progress.create_index([("status", ASCENDING)])
+    await db.user_course_progress.create_index([("user_id", ASCENDING), ("course_id", ASCENDING)], unique=True)
+
+    await db.user_skill_progress.create_index([("user_id", ASCENDING)])
+    await db.user_skill_progress.create_index([("skill_id", ASCENDING)])
+    await db.user_skill_progress.create_index([("source_course_id", ASCENDING)])
+    await db.user_skill_progress.create_index([("status", ASCENDING)])
+    await db.user_skill_progress.create_index([("user_id", ASCENDING), ("skill_name", ASCENDING)], unique=True)
+
     await db.progress_logs.create_index([("user_id", ASCENDING)])
     await db.progress_logs.create_index([("created_at", DESCENDING)])
 

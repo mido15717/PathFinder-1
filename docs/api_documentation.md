@@ -4,98 +4,98 @@ Base URL: `http://localhost:8000`
 
 ## Authentication
 
-### POST `/auth/register`
+- `POST /auth/register` - Registers a student. Passwords are hashed before storage.
+- `POST /auth/login` - Returns a JWT access token.
+- `GET /auth/me` - Returns the authenticated user.
+- `POST /auth/logout` - Client-side logout acknowledgement.
 
-Registers a student and returns a JWT token.
+## Users And Profiles
 
-Request:
+- `GET /users/me`
+- `PUT /users/me`
+- `GET /profiles/me`
+- `PUT /profiles/me`
 
-```json
-{
-  "fullName": "PathFinder Student",
-  "email": "student@example.com",
-  "password": "secret123",
-  "university": "Faculty of Computer Science",
-  "academicYear": "Third year",
-  "selectedCareerPath": "software-engineer",
-  "careerInterest": "Software Engineer",
-  "studyHoursPerWeek": 8
-}
-```
+## Careers And Assessment
 
-### POST `/auth/login`
-
-Authenticates a student.
-
-Request:
-
-```json
-{
-  "email": "student@example.com",
-  "password": "secret123",
-  "remember": true
-}
-```
-
-## Users
-
-- `GET /users/me` - Returns the authenticated student profile.
-- `PUT /users/me` - Updates profile fields.
-
-## Careers
-
-- `GET /careers` - Returns all career paths.
-- `GET /careers/{career_id}` - Returns details for one career path.
-
-## Career Assessment
-
-### POST `/quiz/submit`
-
-Submits assessment answers and returns AI-style career matching analysis.
-
-Response includes:
-
-- Best matched career path
-- Match percentage
-- Top 3 alternative careers
-- Full ranked career match list with match percentage for every career path
-- Strengths
-- Weaknesses
-- Recommended skills to improve
-
-Roadmap generation stays separate through `POST /roadmaps/generate`.
+- `GET /careers`
+- `GET /careers/{career_id}`
+- `POST /careers`
+- `PUT /careers/{career_id}`
+- `DELETE /careers/{career_id}`
+- `POST /assessments/submit`
+- `GET /assessments/me`
+- `GET /matches/me`
 
 ## Roadmaps
 
-- `GET /roadmaps/my-roadmap` - Returns or creates the current user's roadmap.
-- `POST /roadmaps/generate` - Generates a roadmap for a chosen career.
-- `PATCH /roadmaps/progress` - Updates completion for one skill.
+- `GET /roadmaps`
+- `GET /roadmaps/{roadmap_id}`
+- `GET /roadmaps/career/{career_id}`
+- `POST /roadmaps/generate`
+- `GET /roadmaps/my-roadmap`
+- `PATCH /roadmaps/progress`
 
-Progress update request:
+## Progress Monitoring System
+
+Progress monitoring is not only part of the recommendation algorithm itself. It is implemented at the full-system level using the frontend and database to track each student’s course completion and learning progress over time. Later, this tracked progress can be passed to the recommendation backend so the RAG/LLM module can adapt future course recommendations based on what the student has already completed.
+
+- `GET /progress/summary` - Returns overall roadmap progress, completed courses count, in-progress courses count, completed skills count, current phase, next recommended task, and recent activity.
+- `GET /progress/courses` - Returns all tracked courses grouped into `not_started`, `in_progress`, and `completed`.
+- `PATCH /progress/courses/{course_id}` - Updates a course status/progress percentage. Completing a course updates related skills and writes a progress log.
+- `GET /progress/roadmap` - Returns phase-by-phase roadmap progress with completed courses and skills.
+- `PATCH /progress/roadmap/phase/{phase_id}` - Updates one roadmap phase status/progress.
+- `GET /progress/logs` - Returns recent progress history.
+- `POST /progress/recalculate` - Recalculates saved learning-path progress from courses, skills, and roadmap phases.
+
+Course update request:
 
 ```json
 {
-  "phaseId": "software-engineer-dsa",
-  "skillId": "arrays-strings",
-  "completed": true
+  "status": "completed",
+  "progress_percentage": 100
 }
 ```
 
-## Progress
+Phase update request:
 
-- `GET /progress/summary` - Returns overall progress, completed skills, remaining skills, streak, weekly study target, and recent completed tasks.
+```json
+{
+  "status": "in_progress",
+  "progress_percentage": 60
+}
+```
 
-## Advanced Platform
+## Study Planner
 
-- `GET /dashboard/summary` - Returns career readiness score, roadmap progress, completed skills/projects, weekly study hours, streak, next recommended task, and recent activity.
-- `GET /platform/state` - Returns the advanced platform state for skill tracker, project portfolio, study planner, resume builder, interview prep, certifications, GitHub checklist, and reminders.
-- `PUT /platform/state` - Accepts a full platform state payload for future backend persistence.
-- `GET /skills` - Returns skill tracker items for the selected career path.
-- `GET /projects` - Returns suggested portfolio projects for the selected career path.
-- `GET /resources` - Returns learning resources grouped by career path.
-- `POST /planner/generate` - Generates weekly study tasks from career path, weekly hours, and target completion date.
-- `GET /interviews` - Returns technical, behavioral, and coding interview prep tasks.
-- `GET /certifications` - Returns recommended certifications for the selected career path.
-- `GET /portfolio/github-checklist` - Returns GitHub portfolio readiness checklist items.
-- `GET /notifications/settings` - Returns reminder settings for weekly goals, roadmap deadlines, and study streaks.
-- `GET /analytics/summary` - Returns analytics-ready career readiness summary data.
+- `POST /study-plans/generate`
+- `GET /study-plans/me`
+- `PATCH /study-plans/task`
+
+## Platform Modules
+
+- `GET /skills`
+- `GET /skills/{skill_id}`
+- `GET /skills/me`
+- `POST /skills/me`
+- `PATCH /skills/me/{skill_id}`
+- `GET /projects`
+- `GET /projects/career/{career_id}`
+- `GET /projects/me`
+- `POST /projects/me`
+- `PATCH /projects/me/{project_id}`
+- `GET /readiness/me`
+- `POST /readiness/calculate`
+- `GET /resumes/me`
+- `POST /resumes`
+- `PUT /resumes/me`
+- `GET /interviews/questions/{career_id}`
+- `GET /interviews/progress/me`
+- `PATCH /interviews/progress/{question_id}`
+- `GET /certifications`
+- `GET /certifications/career/{career_id}`
+- `GET /certifications/me`
+- `PATCH /certifications/me/{certification_id}`
+- `GET /notifications`
+- `PATCH /notifications/{notification_id}/read`
+- `DELETE /notifications/{notification_id}`

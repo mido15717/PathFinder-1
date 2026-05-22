@@ -4,6 +4,7 @@
 
 - Node.js and npm
 - Python 3.11+
+- MongoDB 7+ running locally or in MongoDB Atlas
 - Expo Go or an Android/iOS emulator
 
 ## Frontend
@@ -22,8 +23,17 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 copy .env.example .env
+python -m app.db.seed_data
 uvicorn app.main:app --reload
 ```
+
+For local MongoDB with Docker:
+
+```powershell
+docker run --name pathfinder-mongo -p 27017:27017 -d mongo:7
+```
+
+If Docker is unavailable, install MongoDB Community Server and make sure `MONGODB_URI` in `.env` points to your running MongoDB instance.
 
 ## Connect Frontend to Backend
 

@@ -85,7 +85,7 @@ backend/
 
 The backend uses these collections:
 
-`users`, `user_profiles`, `career_paths`, `career_assessments`, `career_matches`, `roadmaps`, `user_roadmaps`, `skills`, `user_skills`, `learning_resources`, `projects`, `user_projects`, `study_plans`, `progress_logs`, `career_readiness_scores`, `resumes`, `interview_questions`, `user_interview_progress`, `certifications`, `user_certifications`, `notifications`, `user_settings`, `activity_logs`.
+`users`, `user_profiles`, `career_paths`, `career_assessments`, `career_matches`, `roadmaps`, `user_roadmaps`, `skills`, `user_skills`, `learning_resources`, `projects`, `user_projects`, `study_plans`, `user_learning_paths`, `user_course_progress`, `user_skill_progress`, `progress_logs`, `career_readiness_scores`, `resumes`, `interview_questions`, `user_interview_progress`, `certifications`, `user_certifications`, `notifications`, `user_settings`, `activity_logs`.
 
 Indexes are created automatically on startup from `app/db/indexes.py`.
 
@@ -169,10 +169,10 @@ Recommended first-user flow:
 - Careers: `GET /careers`, `GET /careers/{career_id}`, `POST /careers`, `PUT /careers/{career_id}`, `DELETE /careers/{career_id}`
 - Assessment: `POST /assessments/submit`, `GET /assessments/me`, `GET /matches/me`
 - Roadmaps: `GET /roadmaps`, `GET /roadmaps/{roadmap_id}`, `GET /roadmaps/career/{career_id}`, `POST /roadmaps/generate`, `GET /roadmaps/my-roadmap`, `PATCH /roadmaps/progress`
+- Progress Monitoring System: `GET /progress/summary`, `GET /progress/courses`, `PATCH /progress/courses/{course_id}`, `GET /progress/roadmap`, `PATCH /progress/roadmap/phase/{phase_id}`, `GET /progress/logs`, `POST /progress/recalculate`
 - Skills: `GET /skills`, `GET /skills/{skill_id}`, `GET /skills/me`, `POST /skills/me`, `PATCH /skills/me/{skill_id}`
 - Projects: `GET /projects`, `GET /projects/career/{career_id}`, `GET /projects/me`, `POST /projects/me`, `PATCH /projects/me/{project_id}`
 - Study Planner: `POST /study-plans/generate`, `GET /study-plans/me`, `PATCH /study-plans/task`
-- Progress: `GET /progress/summary`, `GET /progress/logs`
 - Readiness: `GET /readiness/me`, `POST /readiness/calculate`
 - Resume: `GET /resumes/me`, `POST /resumes`, `PUT /resumes/me`
 - Interview: `GET /interviews/questions/{career_id}`, `GET /interviews/progress/me`, `PATCH /interviews/progress/{question_id}`

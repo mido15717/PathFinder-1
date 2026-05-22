@@ -9,6 +9,8 @@ import { CareerWorkspaceScreen } from "../screens/main/CareerWorkspaceScreen";
 import { ExploreScreen } from "../screens/main/ExploreScreen";
 import { HomeScreen } from "../screens/main/HomeScreen";
 import { ProgressScreen } from "../screens/main/ProgressScreen";
+import { CourseProgressScreen } from "../screens/progress/CourseProgressScreen";
+import { RoadmapProgressScreen } from "../screens/progress/RoadmapProgressScreen";
 import { CareerAssessmentScreen } from "../screens/roadmap/CareerAssessmentScreen";
 import { RoadmapDetailsScreen } from "../screens/roadmap/RoadmapDetailsScreen";
 import { RoadmapScreen } from "../screens/roadmap/RoadmapScreen";
@@ -63,6 +65,8 @@ function ProgressNavigator() {
   return (
     <ProgressStack.Navigator screenOptions={{ headerShown: false }}>
       <ProgressStack.Screen name="ProgressMain" component={ProgressScreen} />
+      <ProgressStack.Screen name="CourseProgress" component={CourseProgressScreen} />
+      <ProgressStack.Screen name="RoadmapProgress" component={RoadmapProgressScreen} />
     </ProgressStack.Navigator>
   );
 }

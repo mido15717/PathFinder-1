@@ -24,6 +24,8 @@ export type ExploreStackParamList = {
 
 export type ProgressStackParamList = {
   ProgressMain: undefined;
+  CourseProgress: undefined;
+  RoadmapProgress: undefined;
 };
 
 export type ProfileStackParamList = {

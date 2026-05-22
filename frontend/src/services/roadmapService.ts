@@ -73,6 +73,31 @@ const tokenize = (values: string[] | string) => {
 
 const unique = (items: string[]) => Array.from(new Set(items.filter(Boolean)));
 
+const toBackendProgrammingLevel = (value: string) => {
+  if (value.toLowerCase().includes("advanced")) return "advanced";
+  if (value.toLowerCase().includes("intermediate") || value.toLowerCase().includes("project")) return "intermediate";
+  return "beginner";
+};
+
+const toBackendLearningStyle = (value: string) => {
+  const text = value.toLowerCase();
+  if (text.includes("video")) return "video";
+  if (text.includes("documentation") || text.includes("book") || text.includes("note")) return "reading";
+  if (text.includes("project")) return "project";
+  return "mixed";
+};
+
+const careerByBackendTitle = (title: string) =>
+  careers.find((career) => career.title.toLowerCase() === title.toLowerCase()) || getCareerById(inferCareerFromQuiz({
+    preferredArea: title,
+    experienceLevel: "Beginner",
+    favoriteSubjects: [],
+    careerGoal: title,
+    studyHoursPerWeek: 8,
+    learningStyle: "Project-based",
+    currentSkills: []
+  }));
+
 const scoreCareer = (career: CareerPath, answers: QuizAnswers) => {
   let score = 18;
   const reasons: string[] = [];
@@ -162,7 +187,14 @@ const buildAssessment = (answers: QuizAnswers): CareerAssessmentResult => {
 export const roadmapService = {
   async getMyRoadmap(defaultCareerId = "ai-engineer") {
     if (USE_BACKEND_API) {
-      return apiRequest<{ career: ReturnType<typeof getCareerById>; phases: RoadmapPhase[] }>("/roadmaps/my-roadmap");
+      try {
+        const response = await apiRequest<any>("/roadmaps/my-roadmap");
+        if (response?.career && response?.phases) {
+          return response as { career: ReturnType<typeof getCareerById>; phases: RoadmapPhase[] };
+        }
+      } catch {
+        // The mobile app keeps a local roadmap fallback while backend roadmap records are being created.
+      }
     }
 
     await delay();
@@ -175,10 +207,42 @@ export const roadmapService = {
 
   async assessCareer(answers: QuizAnswers) {
     if (USE_BACKEND_API) {
-      return apiRequest<CareerAssessmentResult>("/quiz/submit", {
-        method: "POST",
-        body: answers
-      });
+      try {
+        const response = await apiRequest<any>("/assessments/submit", {
+          method: "POST",
+          body: {
+            answers,
+            preferred_area: answers.preferredArea,
+            programming_level: toBackendProgrammingLevel(answers.experienceLevel),
+            favorite_subjects: answers.favoriteSubjects,
+            current_skills: answers.currentSkills,
+            career_goal: answers.careerGoal,
+            weekly_hours: answers.studyHoursPerWeek,
+            learning_style: toBackendLearningStyle(answers.learningStyle)
+          }
+        });
+        const matches = response?.matches?.matches || [];
+        if (!matches.length) {
+          return buildAssessment(answers);
+        }
+        const mapped = matches.map((match: any) => ({
+          career: careerByBackendTitle(match.career_title || ""),
+          matchPercentage: Math.round(match.match_percentage || 0),
+          reasons: match.reasons || []
+        }));
+        const best = mapped[0];
+        return {
+          bestCareer: best.career,
+          matchPercentage: best.matchPercentage,
+          alternatives: mapped.slice(1, 4),
+          allMatches: mapped,
+          strengths: matches[0]?.strengths || [],
+          weaknesses: matches[0]?.weaknesses || [],
+          recommendedSkills: matches[0]?.recommended_improvements || []
+        };
+      } catch {
+        return buildAssessment(answers);
+      }
     }
 
     await delay(900);
@@ -201,10 +265,17 @@ export const roadmapService = {
 
   async getRoadmapByCareer(careerId: string) {
     if (USE_BACKEND_API) {
-      return apiRequest<{ career: ReturnType<typeof getCareerById>; phases: RoadmapPhase[] }>("/roadmaps/generate", {
-        method: "POST",
-        body: { careerId }
-      });
+      try {
+        const response = await apiRequest<any>("/roadmaps/generate", {
+          method: "POST",
+          body: { career_path_id: careerId }
+        });
+        if (response?.career && response?.phases) {
+          return response as { career: ReturnType<typeof getCareerById>; phases: RoadmapPhase[] };
+        }
+      } catch {
+        // Fall through to local roadmap templates for mobile demo continuity.
+      }
     }
 
     await delay();
@@ -217,11 +288,22 @@ export const roadmapService = {
 
   async updateSkillProgress(phases: RoadmapPhase[], phaseId: string, skillId: string, completed: boolean) {
     if (USE_BACKEND_API) {
-      const result = await apiRequest<{ phases: RoadmapPhase[] }>("/roadmaps/progress", {
-        method: "PATCH",
-        body: { phaseId, skillId, completed }
-      });
-      return result.phases;
+      try {
+        const result = await apiRequest<{ phases?: RoadmapPhase[] }>("/roadmaps/progress", {
+          method: "PATCH",
+          body: {
+            phase_id: phaseId,
+            status: completed ? "completed" : "in_progress",
+            progress_percentage: completed ? 100 : undefined,
+            completed_skills: completed ? [skillId] : []
+          }
+        });
+        if (result.phases) {
+          return result.phases;
+        }
+      } catch {
+        // Local update below keeps roadmap interactions responsive if backend roadmap ids are not synced yet.
+      }
     }
 
     await delay(150);

@@ -7,8 +7,11 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { CustomButton } from "../../components/CustomButton";
 import { Header } from "../../components/Header";
+import { ProgressBar } from "../../components/ProgressBar";
 import { SectionTitle } from "../../components/SectionTitle";
 import { useAuth } from "../../contexts/AuthContext";
+import { usePlatform } from "../../contexts/PlatformContext";
+import { useRoadmap } from "../../contexts/RoadmapContext";
 import { getCareerById } from "../../data/careers";
 import { radius, shadow, spacing } from "../../constants/layout";
 import { initials } from "../../utils/validation";
@@ -29,7 +32,11 @@ function InfoRow({ icon, label, value }: { icon: React.ComponentProps<typeof Ion
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const { colors, user, logout } = useAuth();
+  const { dashboard } = usePlatform();
+  const { stats, phases } = useRoadmap();
   const career = getCareerById(user?.selectedCareerPath);
+  const totalCourses = phases.reduce((sum, phase) => sum + phase.courses.length, 0);
+  const completedCourses = phases.reduce((sum, phase) => sum + (phase.progress === 100 ? phase.courses.length : 0), 0);
 
   const confirmLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -59,6 +66,20 @@ export function ProfileScreen() {
           <InfoRow icon="time-outline" label="Study hours per week" value={`${user?.studyHoursPerWeek || 8} hours`} />
         </View>
 
+        <SectionTitle title="Portfolio progress" />
+        <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}>
+          <PortfolioMetric label="Completed courses" value={completedCourses} total={totalCourses} color={colors.primary} />
+          <PortfolioMetric label="Completed skills" value={dashboard.completedSkills} total={dashboard.totalSkills} color={colors.success} />
+          <PortfolioMetric label="Career readiness" percentage={dashboard.careerReadinessScore} color={colors.secondary} />
+          <PortfolioMetric label="Portfolio readiness" percentage={dashboard.portfolioReadiness} color={colors.warning} />
+          <View style={[styles.progressNote, { backgroundColor: colors.surfaceMuted }]}>
+            <Ionicons name="briefcase-outline" size={18} color={colors.primary} />
+            <Text style={[styles.progressNoteText, { color: colors.text }]}>
+              {stats.completedPhases} roadmap phases completed. Keep course progress updated so future recommendations can skip finished material.
+            </Text>
+          </View>
+        </View>
+
         <SectionTitle title="Settings" />
         <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Pressable style={styles.settingRow} onPress={() => navigation.navigate("Settings")}>
@@ -73,6 +94,32 @@ export function ProfileScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function PortfolioMetric({
+  label,
+  value,
+  total,
+  percentage,
+  color
+}: {
+  label: string;
+  value?: number;
+  total?: number;
+  percentage?: number;
+  color: string;
+}) {
+  const { colors } = useAuth();
+  const computed = percentage ?? Math.round(((value || 0) / Math.max(total || 1, 1)) * 100);
+  return (
+    <View style={styles.metricRow}>
+      <View style={styles.metricHeader}>
+        <Text style={[styles.metricLabel, { color: colors.text }]}>{label}</Text>
+        <Text style={[styles.metricValue, { color }]}>{percentage === undefined ? `${value}/${total}` : `${computed}%`}</Text>
+      </View>
+      <ProgressBar value={computed} color={color} />
+    </View>
   );
 }
 
@@ -142,6 +189,42 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.lg,
     overflow: "hidden"
+  },
+  progressCard: {
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+    ...shadow
+  },
+  metricRow: {
+    gap: spacing.sm
+  },
+  metricHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md
+  },
+  metricLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  metricValue: {
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  progressNote: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  progressNoteText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18
   },
   settingRow: {
     minHeight: 58,

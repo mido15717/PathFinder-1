@@ -2,17 +2,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { createDefaultPlatformState, learningResources } from "../data/platform";
 import type { LearningResource, PlatformState, StudyPlan } from "../types";
-import { apiRequest, USE_BACKEND_API } from "./api";
 
 const PLATFORM_KEY = "PATHFINDER_PLATFORM_STATE";
 const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const platformService = {
   async getPlatformState(careerId: string, weeklyHours: number): Promise<PlatformState> {
-    if (USE_BACKEND_API) {
-      return apiRequest<PlatformState>("/platform/state");
-    }
-
     const raw = await AsyncStorage.getItem(PLATFORM_KEY);
     if (!raw) {
       const state = createDefaultPlatformState(careerId, weeklyHours);
@@ -32,34 +27,16 @@ export const platformService = {
   },
 
   async savePlatformState(state: PlatformState) {
-    if (USE_BACKEND_API) {
-      return apiRequest<PlatformState>("/platform/state", {
-        method: "PUT",
-        body: state
-      });
-    }
-
     await AsyncStorage.setItem(PLATFORM_KEY, JSON.stringify(state));
     return state;
   },
 
   async getResources(careerId: string): Promise<LearningResource[]> {
-    if (USE_BACKEND_API) {
-      return apiRequest<LearningResource[]>(`/resources?career_id=${careerId}`);
-    }
-
     await delay();
     return learningResources.filter((resource) => resource.careerIds.includes(careerId) || resource.careerIds.length > 5);
   },
 
   async generateStudyPlan(careerId: string, weeklyHours: number, targetDate: string): Promise<StudyPlan> {
-    if (USE_BACKEND_API) {
-      return apiRequest<StudyPlan>("/planner/generate", {
-        method: "POST",
-        body: { careerId, weeklyHours, targetDate }
-      });
-    }
-
     await delay();
     const baseHours = Math.max(4, weeklyHours);
     return {
