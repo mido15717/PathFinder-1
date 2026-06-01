@@ -1,221 +1,197 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 
-import { CustomButton } from "../../components/CustomButton";
-import { Header } from "../../components/Header";
-import { SectionTitle } from "../../components/SectionTitle";
-import { getCareerById } from "../../data/careers";
-import { useAuth } from "../../contexts/AuthContext";
-import { useRoadmap } from "../../contexts/RoadmapContext";
-import { radius, shadow, spacing } from "../../constants/layout";
-import type { ExploreStackParamList } from "../../navigation/types";
+import { SkillBadge } from "../../components/career/SkillBadge";
+import { Card } from "../../components/common/Card";
+import { CustomButton } from "../../components/common/CustomButton";
+import { ErrorMessage } from "../../components/common/ErrorMessage";
+import { Header } from "../../components/common/Header";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
+import { colors } from "../../constants/colors";
+import { radius, spacing } from "../../constants/spacing";
+import { careerService } from "../../services/careerService";
+import { matchService } from "../../services/matchService";
+import type { CareerPath } from "../../types/career";
+import type { AppStackParamList } from "../../types/navigation";
 
-type Props = NativeStackScreenProps<ExploreStackParamList, "CareerDetails">;
+type Props = NativeStackScreenProps<AppStackParamList, "CareerDetails">;
 
-export function CareerDetailsScreen({ route, navigation }: Props) {
-  const { colors } = useAuth();
-  const { setCareerPath } = useRoadmap();
-  const career = getCareerById(route.params.careerId);
+export function CareerDetailsScreen({ navigation, route }: Props) {
+  const [career, setCareer] = useState<CareerPath | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selecting, setSelecting] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSetCareer = async () => {
-    await setCareerPath(career.id);
-    Alert.alert("Career path updated", `${career.title} is now your selected roadmap.`);
-    navigation.navigate("ExploreMain");
+  useEffect(() => {
+    const loadCareer = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const response = route.params.careerId ? await careerService.getById(route.params.careerId) : await careerService.getBySlug(route.params.slug || "");
+        setCareer(response);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : "Could not load career details");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void loadCareer();
+  }, [route.params.careerId, route.params.slug]);
+
+  const selectCareer = async () => {
+    if (!career) return;
+    setSelecting(true);
+    setError("");
+    try {
+      await matchService.selectCareer(career.id);
+      Alert.alert("Career path selected", `${career.title} is now your target career path.`);
+    } catch (selectError) {
+      const message = selectError instanceof Error ? selectError.message : "Could not select career";
+      setError(message);
+      Alert.alert("Selection failed", message);
+    } finally {
+      setSelecting(false);
+    }
   };
 
-  return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        <Header title={career.title} subtitle={career.difficulty} showBack />
+  if (loading) {
+    return <LoadingSpinner message="Loading career details..." />;
+  }
 
-        <LinearGradient
-          colors={[career.color, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.hero}
-        >
-          <View style={styles.heroPattern}>
-            <View style={styles.heroPatternLine} />
-            <View style={[styles.heroPatternLine, { width: "58%" }]} />
-          </View>
-          <View style={styles.heroIcon}>
-            <Ionicons name={career.icon} size={44} color="#FFFFFF" />
-          </View>
-          <Text style={styles.heroTitle}>{career.title}</Text>
-          <Text style={styles.heroText}>{career.description}</Text>
-        </LinearGradient>
-
-        <Section title="Overview" text={career.overview} />
-        <DetailList title="Main responsibilities" items={career.responsibilities} icon="briefcase-outline" />
-        <DetailList title="Required technical skills" items={career.technicalSkills} icon="construct-outline" />
-        <DetailList title="Recommended tools" items={career.tools} icon="build-outline" />
-        <DetailList title="Suggested projects" items={career.projects} icon="rocket-outline" />
-
-        <SectionTitle title="Learning roadmap preview" />
-        <View style={styles.previewList}>
-          {career.roadmapPreview.map((phase, index) => (
-            <View key={phase} style={[styles.previewRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.previewNumber, { backgroundColor: `${career.color}1A` }]}>
-                <Text style={[styles.previewNumberText, { color: career.color }]}>{index + 1}</Text>
-              </View>
-              <Text style={[styles.previewText, { color: colors.text }]}>{phase}</Text>
-            </View>
-          ))}
+  if (!career) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <Header title="Career details" subtitle="The selected career path could not be loaded." />
+          <ErrorMessage message={error} />
+          <CustomButton title="Go Back" onPress={() => navigation.goBack()} />
         </View>
+      </SafeAreaView>
+    );
+  }
 
-        <CustomButton title="Set as My Career Path" onPress={() => void handleSetCareer()} icon="flag-outline" fullWidth />
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.hero}>
+          <View style={[styles.iconWrap, { backgroundColor: career.color || colors.primary }]}>
+            <Ionicons name={career.icon as any} size={28} color={colors.white} />
+          </View>
+          <View style={styles.heroText}>
+            <Text style={styles.title}>{career.title}</Text>
+            <Text style={styles.subtitle}>{career.difficultyLevel} • {career.averageDurationMonths} months • {career.marketDemand} demand</Text>
+          </View>
+        </View>
+        <ErrorMessage message={error} />
+        <Card style={styles.card}>
+          <Text style={styles.sectionTitle}>Overview</Text>
+          <Text style={styles.body}>{career.overview}</Text>
+        </Card>
+        <DetailSection title="Responsibilities" items={career.responsibilities} />
+        <BadgeSection title="Required Skills" items={career.requiredSkills} />
+        <BadgeSection title="Recommended Tools" items={career.recommendedTools} tone="primary" />
+        <DetailSection title="Suggested Projects" items={career.suggestedProjects} />
+        <DetailSection title="Recommended Certifications" items={career.recommendedCertifications} />
+        <View style={styles.actions}>
+          <CustomButton title="Set as My Career Path" onPress={selectCareer} loading={selecting} />
+          <CustomButton title="Take Assessment" onPress={() => navigation.navigate("CareerAssessment")} variant="outline" />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Section({ title, text }: { title: string; text: string }) {
-  const { colors } = useAuth();
+function DetailSection({ title, items }: { title: string; items: string[] }) {
+  if (!items.length) return null;
   return (
-    <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}>
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-      <Text style={[styles.sectionText, { color: colors.mutedText }]}>{text}</Text>
-    </View>
+    <Card style={styles.card}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {items.map((item) => (
+        <Text key={item} style={styles.bullet}>- {item}</Text>
+      ))}
+    </Card>
   );
 }
 
-function DetailList({
-  title,
-  items,
-  icon
-}: {
-  title: string;
-  items: string[];
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-}) {
-  const { colors } = useAuth();
+function BadgeSection({ title, items, tone = "neutral" }: { title: string; items: string[]; tone?: "primary" | "neutral" }) {
+  if (!items.length) return null;
   return (
-    <View style={styles.detailBlock}>
-      <SectionTitle title={title} />
-      <View style={styles.detailList}>
+    <Card style={styles.card}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.badgeRow}>
         {items.map((item) => (
-          <View key={item} style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name={icon} size={19} color={colors.primary} />
-            <Text style={[styles.detailText, { color: colors.text }]}>{item}</Text>
-          </View>
+          <SkillBadge key={item} label={item} tone={tone} />
         ))}
       </View>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    flex: 1
+    flex: 1,
+    backgroundColor: colors.background
   },
   container: {
-    padding: spacing.xl,
-    gap: spacing.xl,
-    paddingBottom: spacing.xxl
+    gap: spacing.lg,
+    padding: spacing.xl
   },
   hero: {
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    gap: spacing.md,
-    overflow: "hidden"
-  },
-  heroPattern: {
-    position: "absolute",
-    top: 22,
-    right: -24,
-    width: 150,
-    gap: spacing.md,
-    opacity: 0.38
-  },
-  heroPatternLine: {
-    height: 10,
-    width: "86%",
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.3)"
-  },
-  heroIcon: {
-    width: 74,
-    height: 74,
-    borderRadius: 22,
-    backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
-    justifyContent: "center"
+    flexDirection: "row",
+    gap: spacing.md
   },
-  heroTitle: {
-    color: "#FFFFFF",
-    fontSize: 28,
-    fontWeight: "900"
+  iconWrap: {
+    alignItems: "center",
+    borderRadius: radius.md,
+    height: 58,
+    justifyContent: "center",
+    width: 58
   },
   heroText: {
-    color: "#ECFEFF",
-    fontSize: 15,
-    lineHeight: 23,
-    fontWeight: "600"
+    flex: 1,
+    gap: spacing.sm
   },
-  sectionCard: {
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    ...shadow
+  title: {
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: "900"
+  },
+  subtitle: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "capitalize"
+  },
+  card: {
+    gap: spacing.sm
   },
   sectionTitle: {
-    fontSize: 18,
+    color: colors.text,
+    fontSize: 16,
     fontWeight: "900"
   },
-  sectionText: {
-    fontSize: 15,
-    lineHeight: 23
+  body: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 21
   },
-  detailBlock: {
-    gap: spacing.md
+  bullet: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 21
   },
-  detailList: {
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm
   },
-  detailRow: {
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
+  actions: {
     gap: spacing.md
-  },
-  detailText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "700"
-  },
-  previewList: {
-    gap: spacing.sm
-  },
-  previewRow: {
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md
-  },
-  previewNumber: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  previewNumberText: {
-    fontSize: 14,
-    fontWeight: "900"
-  },
-  previewText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "800"
   }
 });

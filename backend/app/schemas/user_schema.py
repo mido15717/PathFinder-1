@@ -1,32 +1,23 @@
-from typing import Any, Literal
+from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
-
-
-class UserUpdate(BaseModel):
-    full_name: str | None = Field(default=None, min_length=2, max_length=120)
-    email: EmailStr | None = None
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-class UserPublic(BaseModel):
-    id: str
+class UserResponse(BaseModel):
+    id: str = Field(alias="_id")
     full_name: str
     email: EmailStr
     role: Literal["student", "admin"]
     is_active: bool
     is_verified: bool
-    created_at: str
-    updated_at: str
-    last_login: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    last_login: datetime | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
-class UserSettingsUpdate(BaseModel):
-    dark_mode: bool | None = None
-    notifications_enabled: bool | None = None
-    email_notifications: bool | None = None
-    language: str | None = Field(default=None, min_length=2, max_length=8)
-    privacy_level: Literal["private", "public", "connections"] | None = None
+class UserUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=2, max_length=100)
 
-
-class GenericUserPayload(BaseModel):
-    data: dict[str, Any]

@@ -1,115 +1,277 @@
+import re
 from typing import Any
 
 from bson import ObjectId
 from fastapi import HTTPException, status
 
-from app.models.career_model import create_match_document
-from app.utils.helpers import clamp
-from app.utils.object_id import serialize_document
+from app.db.mongodb import get_database
+from app.models.user_model import utc_now
+from app.utils.object_id import serialize_document, to_object_id
+
+AREA_KEYWORDS = {
+    "artificial intelligence": {"artificial intelligence", "ai", "machine learning", "deep learning", "models"},
+    "data science": {"data science", "data analysis", "statistics", "machine learning", "analytics"},
+    "software engineering": {"software engineering", "backend", "frontend", "applications", "architecture"},
+    "web development": {"web development", "frontend", "backend", "react", "html css", "javascript"},
+    "mobile development": {"mobile development", "mobile", "react native", "ios", "android"},
+    "cybersecurity": {"cybersecurity", "security", "networks", "threats", "defense"},
+    "cloud computing": {"cloud computing", "cloud", "infrastructure", "aws", "deployment"},
+    "ui ux design": {"ui ux design", "ui", "ux", "design", "human computer interaction", "interfaces"},
+}
+
+PROGRAMMING_LEVEL_SCORE = {
+    "beginner": {"beginner": 1.0, "intermediate": 0.65, "advanced": 0.35},
+    "intermediate": {"beginner": 0.8, "intermediate": 1.0, "advanced": 0.75},
+    "advanced": {"beginner": 0.65, "intermediate": 0.9, "advanced": 1.0},
+}
+
+WEIGHTS = {
+    "area": 25,
+    "skills": 25,
+    "subjects": 15,
+    "goal": 15,
+    "programming_level": 10,
+    "learning_style": 5,
+    "weekly_hours": 5,
+}
 
 
-def _keywords(career: dict[str, Any]) -> set[str]:
-    fields = [
+def _normalize(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value).lower()).strip()
+
+
+def _terms(values: list[str] | tuple[str, ...] | set[str] | str | None) -> set[str]:
+    if values is None:
+        return set()
+    if isinstance(values, str):
+        values = [values]
+    normalized: set[str] = set()
+    for value in values:
+        text = _normalize(value)
+        if text:
+            normalized.add(text)
+    return normalized
+
+
+def _career_haystack(career: dict[str, Any]) -> str:
+    values: list[str] = [
         career.get("title", ""),
         career.get("description", ""),
         career.get("overview", ""),
-        " ".join(career.get("tags", [])),
-        " ".join(career.get("required_skills", [])),
-        " ".join(career.get("recommended_tools", [])),
+        career.get("difficulty_level", ""),
+        career.get("market_demand", ""),
+        career.get("salary_level", ""),
     ]
-    return {token.strip().lower() for field in fields for token in str(field).replace("/", " ").split()}
+    for key in ("required_skills", "recommended_tools", "responsibilities", "tags", "related_subjects", "preferred_learning_styles"):
+        values.extend(str(item) for item in career.get(key, []))
+    return " ".join(_normalize(value) for value in values)
 
 
-def _overlap_score(values: list[str], keywords: set[str], weight: float) -> float:
-    normalized = {item.lower() for item in values}
-    if not normalized:
-        return 0
-    matched = sum(1 for item in normalized if item in keywords or any(item in key for key in keywords))
-    return (matched / len(normalized)) * weight
+def _overlap_score(selected: list[str], career_values: list[str]) -> tuple[float, list[str]]:
+    selected_terms = _terms(selected)
+    career_terms = _terms(career_values)
+    if not selected_terms or not career_terms:
+        return 0.0, []
+    matched = [value for value in selected if _normalize(value) in career_terms]
+    return len(matched) / max(len(selected_terms), 1), matched
 
 
-def _programming_score(level: str, difficulty: str) -> float:
-    level_rank = {"beginner": 1, "intermediate": 2, "advanced": 3}.get(level, 1)
-    difficulty_rank = {"beginner": 1, "intermediate": 2, "advanced": 3}.get(difficulty, 2)
-    gap = abs(level_rank - difficulty_rank)
-    return max(5, 15 - (gap * 5))
+def _skill_score(current_skills: list[str], required_skills: list[str]) -> tuple[float, list[str], list[str]]:
+    current_terms = _terms(current_skills)
+    matched = [skill for skill in required_skills if _normalize(skill) in current_terms]
+    missing = [skill for skill in required_skills if _normalize(skill) not in current_terms]
+    if not required_skills:
+        return 0.0, matched, missing
+    return min(len(matched) / len(required_skills), 1.0), matched, missing
 
 
-def _weekly_hours_score(hours: int, duration_months: int) -> float:
-    if hours >= 12:
-        return 10
-    if hours >= 8:
-        return 8 if duration_months <= 9 else 6
-    if hours >= 5:
-        return 5
-    return 3
-
-
-def _score_career(career: dict[str, Any], assessment: dict[str, Any]) -> dict[str, Any]:
-    keywords = _keywords(career)
-    preferred_area = str(assessment.get("preferred_area") or "").lower()
-    career_goal = str(assessment.get("career_goal") or "").lower()
-    current_skills = assessment.get("current_skills", [])
-    favorite_subjects = assessment.get("favorite_subjects", [])
-
-    area_score = 25 if preferred_area and any(preferred_area in key for key in keywords) else 8
-    skills_score = _overlap_score(current_skills, keywords, 20)
-    subjects_score = _overlap_score(favorite_subjects, keywords, 15)
-    programming_score = _programming_score(
-        assessment.get("programming_level", "beginner"),
-        career.get("difficulty_level", "intermediate"),
+def _area_score(preferred_area: str, career: dict[str, Any]) -> float:
+    normalized_area = _normalize(preferred_area)
+    if normalized_area == "not sure yet":
+        return 0.5
+    keywords = AREA_KEYWORDS.get(normalized_area, {normalized_area})
+    direct_haystack = " ".join(
+        _normalize(value)
+        for value in [career.get("title", ""), career.get("description", ""), *career.get("tags", [])]
     )
-    goal_score = 10 if career_goal and any(token in keywords for token in career_goal.split()) else 4
-    style_score = 5 if assessment.get("learning_style") in {"project", "mixed"} else 3
-    hours_score = _weekly_hours_score(
-        int(assessment.get("weekly_hours") or 0),
-        int(career.get("average_duration_months") or 6),
+    if any(keyword in direct_haystack for keyword in keywords):
+        return 1.0
+    related_haystack = " ".join(_normalize(value) for value in [*career.get("related_subjects", []), *career.get("required_skills", [])])
+    return 0.65 if any(keyword in related_haystack for keyword in keywords) else 0.0
+
+
+def _goal_score(assessment: dict[str, Any], career: dict[str, Any]) -> float:
+    haystack = _career_haystack(career)
+    goal_terms = _terms([assessment.get("career_goal", ""), assessment.get("preferred_work_type", "")])
+    if not goal_terms:
+        return 0.0
+    direct_matches = sum(1 for term in goal_terms if term in haystack)
+    direct_score = min(direct_matches / len(goal_terms), 1.0) if direct_matches else 0.0
+    work_type = _normalize(assessment.get("preferred_work_type", ""))
+    soft_map = {
+        "building applications": {"backend", "frontend", "mobile", "software", "applications"},
+        "analyzing data": {"data", "statistics", "analytics", "machine learning"},
+        "solving security problems": {"security", "cybersecurity", "networks"},
+        "designing interfaces": {"design", "ux", "ui", "interfaces"},
+        "working with infrastructure": {"cloud", "devops", "infrastructure"},
+        "research and experimentation": {"ai", "machine learning", "research", "models"},
+    }
+    keywords = soft_map.get(work_type, set())
+    mapped_score = 1.0 if any(keyword in haystack for keyword in keywords) else 0.4
+    return max(direct_score, mapped_score)
+
+
+def _programming_score(programming_level: str, career: dict[str, Any]) -> float:
+    student_level = _normalize(programming_level)
+    career_level = _normalize(career.get("difficulty_level", "beginner"))
+    return PROGRAMMING_LEVEL_SCORE.get(student_level, {}).get(career_level, 0.5)
+
+
+def _learning_style_score(learning_style: str, career: dict[str, Any]) -> float:
+    preferred_styles = _terms(career.get("preferred_learning_styles", []))
+    if not preferred_styles:
+        return 0.5
+    style = _normalize(learning_style)
+    if style in preferred_styles or "mixed learning" in preferred_styles or style == "mixed learning":
+        return 1.0
+    return 0.4
+
+
+def _weekly_hours_score(hours: int, career: dict[str, Any]) -> float:
+    difficulty = _normalize(career.get("difficulty_level", "beginner"))
+    if difficulty == "advanced":
+        return 1.0 if hours >= 10 else 0.75 if hours >= 7 else 0.45
+    if difficulty == "intermediate":
+        return 1.0 if hours >= 7 else 0.8 if hours >= 4 else 0.5
+    return 1.0 if hours >= 4 else 0.75
+
+
+def _match_level(score: int) -> str:
+    if score >= 85:
+        return "excellent"
+    if score >= 70:
+        return "high"
+    if score >= 50:
+        return "medium"
+    return "low"
+
+
+def _build_reasons(
+    assessment: dict[str, Any],
+    career: dict[str, Any],
+    area_score: float,
+    matched_skills: list[str],
+    matched_subjects: list[str],
+    goal_score: float,
+) -> list[str]:
+    reasons: list[str] = []
+    if area_score >= 0.8:
+        reasons.append(f"Your interest in {assessment['preferred_area']} aligns strongly with {career['title']}.")
+    if matched_skills:
+        reasons.append(f"Your current skills match key requirements: {', '.join(matched_skills[:4])}.")
+    if matched_subjects:
+        reasons.append(f"Your favorite subjects overlap with this path: {', '.join(matched_subjects[:4])}.")
+    if goal_score >= 0.8:
+        reasons.append("Your career goal and preferred work style fit the responsibilities of this path.")
+    if not reasons:
+        reasons.append("This career shares some foundations with your assessment answers, but it needs focused preparation.")
+    return reasons
+
+
+def _improvements(missing_skills: list[str], career: dict[str, Any], hours: int) -> list[str]:
+    improvements = [f"Build fundamentals in {skill}." for skill in missing_skills[:3]]
+    if hours < 7 and career.get("difficulty_level") in {"intermediate", "advanced"}:
+        improvements.append("Increase weekly study time to keep pace with this path.")
+    project = next(iter(career.get("suggested_projects", [])), None)
+    if project:
+        improvements.append(f"Complete a portfolio project such as: {project}.")
+    return improvements[:5]
+
+
+def calculate_top_matches(assessment: dict[str, Any], careers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for career in careers:
+        area_score = _area_score(assessment["preferred_area"], career)
+        skills_score, matched_skills, missing_skills = _skill_score(assessment.get("current_skills", []), career.get("required_skills", []))
+        subjects_score, matched_subjects = _overlap_score(assessment.get("favorite_subjects", []), career.get("related_subjects", []))
+        goal_score = _goal_score(assessment, career)
+        programming_score = _programming_score(assessment["programming_level"], career)
+        learning_style_score = _learning_style_score(assessment["learning_style"], career)
+        weekly_hours_score = _weekly_hours_score(assessment["weekly_available_hours"], career)
+        weighted_score = (
+            area_score * WEIGHTS["area"]
+            + skills_score * WEIGHTS["skills"]
+            + subjects_score * WEIGHTS["subjects"]
+            + goal_score * WEIGHTS["goal"]
+            + programming_score * WEIGHTS["programming_level"]
+            + learning_style_score * WEIGHTS["learning_style"]
+            + weekly_hours_score * WEIGHTS["weekly_hours"]
+        )
+        percentage = max(0, min(100, round(weighted_score)))
+        strengths = list(dict.fromkeys(matched_skills + matched_subjects + [assessment["programming_level"], assessment["learning_style"]]))[:6]
+        weaknesses = [f"Needs stronger {skill}." for skill in missing_skills[:4]]
+        if not weaknesses:
+            weaknesses = ["Keep building depth through applied projects."]
+        results.append(
+            {
+                "career_path_id": career["_id"],
+                "career_title": career["title"],
+                "career_slug": career["slug"],
+                "match_percentage": percentage,
+                "match_level": _match_level(percentage),
+                "reasons": _build_reasons(assessment, career, area_score, matched_skills, matched_subjects, goal_score),
+                "strengths": strengths,
+                "weaknesses": weaknesses,
+                "recommended_improvements": _improvements(missing_skills, career, assessment["weekly_available_hours"]),
+                "matched_skills": matched_skills,
+                "missing_skills": missing_skills[:6],
+            }
+        )
+    return sorted(results, key=lambda item: item["match_percentage"], reverse=True)[:3]
+
+
+async def get_latest_match_for_user(user_id: ObjectId | str) -> dict[str, Any]:
+    db = get_database()
+    user_object_id = to_object_id(user_id, "user_id")
+    match = await db.career_matches.find_one({"user_id": user_object_id}, sort=[("created_at", -1)])
+    if not match:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No career match result found")
+    return serialize_document(match)
+
+
+async def select_career_for_user(user_id: ObjectId | str, career_path_id: str) -> dict[str, Any]:
+    db = get_database()
+    user_object_id = to_object_id(user_id, "user_id")
+    career_object_id = to_object_id(career_path_id, "career_path_id")
+    career = await db.career_paths.find_one({"_id": career_object_id, "is_active": True})
+    if not career:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Career path not found")
+
+    now = utc_now()
+    latest_match = await db.career_matches.find_one({"user_id": user_object_id}, sort=[("created_at", -1)])
+    match_id = None
+    if latest_match:
+        match_id = latest_match["_id"]
+        await db.career_matches.update_one(
+            {"_id": latest_match["_id"]},
+            {"$set": {"selected_career_id": career_object_id, "updated_at": now}},
+        )
+
+    await db.user_profiles.update_one(
+        {"user_id": user_object_id},
+        {
+            "$set": {
+                "selected_career_path_id": career_object_id,
+                "selected_career_title": career["title"],
+                "career_goal": career["title"],
+                "updated_at": now,
+            }
+        },
+        upsert=False,
     )
-    total = round(clamp(area_score + skills_score + subjects_score + programming_score + goal_score + style_score + hours_score), 2)
-
-    matched_skills = [
-        skill for skill in current_skills if skill.lower() in keywords or any(skill.lower() in key for key in keywords)
-    ]
-    missing_skills = [
-        skill for skill in career.get("required_skills", []) if skill.lower() not in {item.lower() for item in current_skills}
-    ][:5]
-
-    reasons = [
-        f"Your preferred area aligns with {career['title']}" if area_score >= 20 else f"{career['title']} still has partial overlap with your interests",
-        f"Your programming level is a {assessment.get('programming_level')} fit for this path",
-        f"You can invest {assessment.get('weekly_hours')} hours weekly, which supports steady progress",
-    ]
-    strengths = matched_skills or ["Clear career motivation", "Consistent weekly availability"]
-    weaknesses = missing_skills or ["Build deeper proof of work through projects"]
-    improvements = [f"Practice {skill}" for skill in missing_skills[:3]] or ["Complete one portfolio project for this path"]
 
     return {
-        "career_path_id": career["_id"],
-        "career_title": career["title"],
-        "match_percentage": total,
-        "reasons": reasons,
-        "strengths": strengths,
-        "weaknesses": weaknesses,
-        "recommended_improvements": improvements,
+        "selected_career_id": str(career_object_id),
+        "selected_career_title": career["title"],
+        "match_id": str(match_id) if match_id else None,
     }
-
-
-async def calculate_and_store_matches(
-    db,
-    user_id: ObjectId,
-    assessment_id: ObjectId,
-    assessment: dict[str, Any],
-) -> dict[str, Any]:
-    careers = await db.career_paths.find({"is_active": True}).to_list(length=None)
-    if not careers:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No career paths available")
-
-    matches = sorted(
-        [_score_career(career, assessment) for career in careers],
-        key=lambda item: item["match_percentage"],
-        reverse=True,
-    )[:3]
-    match_document = create_match_document(user_id, assessment_id, matches)
-    result = await db.career_matches.insert_one(match_document)
-    saved = await db.career_matches.find_one({"_id": result.inserted_id})
-    return serialize_document(saved)

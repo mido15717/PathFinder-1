@@ -1,39 +1,35 @@
 import React from "react";
-import { DarkTheme, DefaultTheme, NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { useAuth } from "../contexts/AuthContext";
+import { AssessmentResultScreen } from "../screens/assessment/AssessmentResultScreen";
+import { CareerAssessmentScreen } from "../screens/assessment/CareerAssessmentScreen";
+import { CareerDetailsScreen } from "../screens/career/CareerDetailsScreen";
+import type { AppStackParamList } from "../types/navigation";
 import { AuthNavigator } from "./AuthNavigator";
-import { MainNavigator } from "./MainNavigator";
-import { OnboardingScreen } from "../screens/onboarding/OnboardingScreen";
-import { SplashScreen } from "../screens/onboarding/SplashScreen";
+import { MainTabNavigator } from "./MainTabNavigator";
+
+const AppStack = createNativeStackNavigator<AppStackParamList>();
+
+function AppNavigator() {
+  return (
+    <AppStack.Navigator screenOptions={{ headerShown: false }}>
+      <AppStack.Screen name="MainTabs" component={MainTabNavigator} />
+      <AppStack.Screen name="CareerAssessment" component={CareerAssessmentScreen} />
+      <AppStack.Screen name="AssessmentResult" component={AssessmentResultScreen} />
+      <AppStack.Screen name="CareerDetails" component={CareerDetailsScreen} />
+    </AppStack.Navigator>
+  );
+}
 
 export function RootNavigator() {
-  const { colors, isLoading, user, hasSeenOnboarding, settings } = useAuth();
-  const baseTheme = settings.darkMode ? DarkTheme : DefaultTheme;
-  const navigationTheme = {
-    ...baseTheme,
-    colors: {
-      ...baseTheme.colors,
-      primary: colors.primary,
-      background: colors.background,
-      card: colors.surface,
-      text: colors.text,
-      border: colors.border,
-      notification: colors.secondary
-    }
-  };
+  const { user, loading } = useAuth();
 
-  return (
-    <NavigationContainer theme={navigationTheme}>
-      {isLoading ? (
-        <SplashScreen />
-      ) : !hasSeenOnboarding ? (
-        <OnboardingScreen />
-      ) : user ? (
-        <MainNavigator />
-      ) : (
-        <AuthNavigator />
-      )}
-    </NavigationContainer>
-  );
+  if (loading) {
+    return <LoadingSpinner message="Preparing PathFinder..." />;
+  }
+
+  return <NavigationContainer>{user ? <AppNavigator /> : <AuthNavigator />}</NavigationContainer>;
 }

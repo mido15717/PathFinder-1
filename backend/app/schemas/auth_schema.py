@@ -1,26 +1,21 @@
-from typing import Any, Literal
-
 from pydantic import BaseModel, EmailStr, Field
+
+from app.schemas.user_schema import UserResponse
 
 
 class RegisterRequest(BaseModel):
-    full_name: str = Field(..., min_length=2, max_length=120)
+    full_name: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
-    role: Literal["student", "admin"] = "student"
+    password: str = Field(..., min_length=6, max_length=128)
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: dict[str, Any]
+    user: UserResponse
 
-
-class AuthMessage(BaseModel):
-    success: bool
-    message: str

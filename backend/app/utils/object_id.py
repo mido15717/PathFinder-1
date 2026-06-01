@@ -5,18 +5,11 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 
 
-def is_valid_object_id(value: Any) -> bool:
-    return isinstance(value, ObjectId) or ObjectId.is_valid(str(value))
-
-
 def to_object_id(value: Any, field_name: str = "id") -> ObjectId:
     if isinstance(value, ObjectId):
         return value
     if not ObjectId.is_valid(str(value)):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {field_name}",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid {field_name}")
     return ObjectId(str(value))
 
 
@@ -40,3 +33,4 @@ def serialize_document(document: dict[str, Any] | None) -> dict[str, Any] | None
 
 def serialize_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [serialize_value(document) for document in documents]
+

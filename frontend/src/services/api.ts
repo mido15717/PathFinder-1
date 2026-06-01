@@ -1,14 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const API_TOKEN_KEY = "PATHFINDER_AUTH_TOKEN";
+export const API_USER_KEY = "PATHFINDER_AUTH_USER";
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
 
 export const API_BASE_URL = env?.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8000";
-export const API_MODE = env?.EXPO_PUBLIC_API_MODE || "mock";
-export const USE_BACKEND_API = API_MODE === "backend";
 
-type ApiRequestOptions = Omit<RequestInit, "body"> & {
+type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   auth?: boolean;
 };
@@ -25,7 +24,7 @@ export async function clearStoredToken() {
   await AsyncStorage.removeItem(API_TOKEN_KEY);
 }
 
-export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
+export async function apiRequest<T>(endpoint: string, options: ApiOptions = {}): Promise<T> {
   const token = options.auth === false ? null : await getStoredToken();
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -40,20 +39,17 @@ export async function apiRequest<T>(endpoint: string, options: ApiRequestOptions
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers,
-    body: options.body ? JSON.stringify(options.body) : undefined
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
   });
 
   const raw = await response.text();
   const payload = raw ? JSON.parse(raw) : null;
 
   if (!response.ok) {
-    const message =
-      payload?.detail ||
-      payload?.error ||
-      payload?.message ||
-      `Request failed with status ${response.status}`;
-    throw new Error(message);
+    const detail = payload?.detail || payload?.message || `Request failed with status ${response.status}`;
+    throw new Error(Array.isArray(detail) ? detail.map((item) => item.msg).join(", ") : detail);
   }
 
   return payload as T;
 }
+

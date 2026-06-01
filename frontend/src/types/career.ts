@@ -1,0 +1,25 @@
+export type CareerPath = {
+  id: string;
+  title: string;
+  slug: string;
+  description: string;
+  overview: string;
+  difficultyLevel: "beginner" | "intermediate" | "advanced" | string;
+  averageDurationMonths: number;
+  requiredSkills: string[];
+  recommendedTools: string[];
+  responsibilities: string[];
+  suggestedProjects: string[];
+  recommendedCertifications: string[];
+  marketDemand: string;
+  salaryLevel: string;
+  tags: string[];
+  relatedSubjects: string[];
+  preferredPersonalityTraits: string[];
+  preferredLearningStyles: string[];
+  icon: string;
+  color: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};

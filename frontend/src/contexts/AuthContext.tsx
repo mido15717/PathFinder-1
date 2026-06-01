@@ -1,150 +1,109 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+import type { LoginRequest, RegisterRequest } from "../types/auth";
+import type { User } from "../types/user";
+import { API_TOKEN_KEY, API_USER_KEY, clearStoredToken, setStoredToken } from "../services/api";
 import { authService } from "../services/authService";
-import { darkColors, lightColors } from "../constants/colors";
-import type { AcademicYear, AppSettings, AuthResult, User } from "../types";
-
-type RegisterPayload = {
-  fullName: string;
-  email: string;
-  password: string;
-  university: string;
-  academicYear: AcademicYear;
-};
 
 type AuthContextValue = {
   user: User | null;
   token: string | null;
-  settings: AppSettings;
-  colors: typeof lightColors;
-  isLoading: boolean;
-  hasSeenOnboarding: boolean;
-  login: (email: string, password: string, remember: boolean) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
+  loading: boolean;
+  login: (payload: LoginRequest) => Promise<void>;
+  register: (payload: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
-  completeOnboarding: () => Promise<void>;
-  updateProfile: (updates: Partial<User>) => Promise<void>;
-  updateSettings: (updates: Partial<AppSettings>) => Promise<void>;
+  refreshCurrentUser: () => Promise<void>;
+  setUser: (user: User) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<AuthResult | null>(null);
-  const [settings, setSettings] = useState<AppSettings>({ darkMode: false, notifications: true });
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUserState] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const persistUser = useCallback(async (nextUser: User) => {
+    setUserState(nextUser);
+    await AsyncStorage.setItem(API_USER_KEY, JSON.stringify(nextUser));
+  }, []);
 
   useEffect(() => {
-    const bootstrap = async () => {
+    const loadSession = async () => {
       try {
-        const [currentSession, onboardingComplete, savedSettings] = await Promise.all([
-          authService.getCurrentUser(),
-          authService.getOnboardingComplete(),
-          authService.getSettings()
-        ]);
-        setSession(currentSession);
-        setHasSeenOnboarding(onboardingComplete);
-        setSettings(savedSettings);
+        const [storedToken, storedUser] = await Promise.all([AsyncStorage.getItem(API_TOKEN_KEY), AsyncStorage.getItem(API_USER_KEY)]);
+        if (storedToken) setToken(storedToken);
+        if (storedUser) setUserState(JSON.parse(storedUser) as User);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
-
-    void bootstrap();
+    void loadSession();
   }, []);
 
-  const login = useCallback(async (email: string, password: string, remember: boolean) => {
-    const result = await authService.login(email, password, remember);
-    setSession(result);
-  }, []);
-
-  const register = useCallback(async (payload: RegisterPayload) => {
-    const result = await authService.register({
-      ...payload,
-      selectedCareerPath: "software-engineer",
-      careerInterest: "Software Engineer",
-      studyHoursPerWeek: 8
-    });
-    setSession(result);
-    await authService.setOnboardingComplete();
-    setHasSeenOnboarding(true);
-  }, []);
-
-  const forgotPassword = useCallback(async (email: string) => {
-    await authService.forgotPassword(email);
-  }, []);
-
-  const logout = useCallback(async () => {
-    await authService.logout();
-    setSession(null);
-  }, []);
-
-  const completeOnboarding = useCallback(async () => {
-    await authService.setOnboardingComplete();
-    setHasSeenOnboarding(true);
-  }, []);
-
-  const updateProfile = useCallback(
-    async (updates: Partial<User>) => {
-      if (!session?.user) return;
-      const nextUser = { ...session.user, ...updates };
-      const nextSession = { ...session, user: nextUser };
-      setSession(nextSession);
-      if (session.token) {
-        await authService.persistUser(nextUser);
-      }
+  const commitAuth = useCallback(
+    async (accessToken: string, nextUser: User) => {
+      setToken(accessToken);
+      await setStoredToken(accessToken);
+      await persistUser(nextUser);
     },
-    [session]
+    [persistUser]
   );
 
-  const updateSettings = useCallback(async (updates: Partial<AppSettings>) => {
-    setSettings((current) => {
-      const next = { ...current, ...updates };
-      void authService.persistSettings(next);
-      return next;
-    });
+  const login = useCallback(
+    async (payload: LoginRequest) => {
+      const response = await authService.login(payload);
+      await commitAuth(response.accessToken, response.user);
+    },
+    [commitAuth]
+  );
+
+  const register = useCallback(
+    async (payload: RegisterRequest) => {
+      const response = await authService.register(payload);
+      await commitAuth(response.accessToken, response.user);
+    },
+    [commitAuth]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Local session cleanup should still happen if the network is unavailable.
+    }
+    setUserState(null);
+    setToken(null);
+    await Promise.all([clearStoredToken(), AsyncStorage.removeItem(API_USER_KEY)]);
   }, []);
 
-  const value = useMemo<AuthContextValue>(
+  const refreshCurrentUser = useCallback(async () => {
+    const nextUser = await authService.me();
+    await persistUser(nextUser);
+  }, [persistUser]);
+
+  const value = useMemo(
     () => ({
-      user: session?.user ?? null,
-      token: session?.token ?? null,
-      settings,
-      colors: settings.darkMode ? darkColors : lightColors,
-      isLoading,
-      hasSeenOnboarding,
+      user,
+      token,
+      loading,
       login,
       register,
-      forgotPassword,
       logout,
-      completeOnboarding,
-      updateProfile,
-      updateSettings
+      refreshCurrentUser,
+      setUser: persistUser
     }),
-    [
-      session,
-      settings,
-      isLoading,
-      hasSeenOnboarding,
-      login,
-      register,
-      forgotPassword,
-      logout,
-      completeOnboarding,
-      updateProfile,
-      updateSettings
-    ]
+    [loading, login, logout, persistUser, refreshCurrentUser, register, token, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider.");
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
-};
+}
