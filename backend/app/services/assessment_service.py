@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from app.db.mongodb import get_database
 from app.models.assessment_model import create_assessment_document
 from app.models.match_model import create_match_document
-from app.models.user_model import utc_now
+from app.models.base_model import utc_now
 from app.services.matching_service import calculate_top_matches
 from app.utils.object_id import serialize_document, serialize_documents, serialize_value, to_object_id
 

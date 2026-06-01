@@ -8,6 +8,7 @@ import { ExploreCareersScreen } from "../screens/main/ExploreCareersScreen";
 import { HomeScreen } from "../screens/main/HomeScreen";
 import { EditProfileScreen } from "../screens/profile/EditProfileScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
+import { ProgressDashboardScreen } from "../screens/progress/ProgressDashboardScreen";
 import type { MainTabParamList, ProfileStackParamList } from "../types/navigation";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -48,6 +49,7 @@ export function MainTabNavigator() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="ExploreCareers" component={ExploreCareersScreen} options={{ title: "Careers" }} />
+      <Tab.Screen name="Progress" component={ProgressDashboardScreen} />
       <Tab.Screen name="Profile" component={ProfileNavigator} />
     </Tab.Navigator>
   );
@@ -56,5 +58,6 @@ export function MainTabNavigator() {
 function getIconName(routeName: keyof MainTabParamList, focused: boolean): keyof typeof Ionicons.glyphMap {
   if (routeName === "Home") return focused ? "home" : "home-outline";
   if (routeName === "ExploreCareers") return focused ? "compass" : "compass-outline";
+  if (routeName === "Progress") return focused ? "analytics" : "analytics-outline";
   return focused ? "person-circle" : "person-circle-outline";
 }

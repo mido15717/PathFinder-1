@@ -1,8 +1,11 @@
 # PathFinder Backend
 
-FastAPI backend for PathFinder Milestones 1 and 2.
+FastAPI backend for PathFinder Milestones 1, 2, and 3.
 
-Milestone 1 covers authentication and profile basics. Milestone 2 adds career paths, assessments, career matching, and selected career persistence.
+- Milestone 1: authentication and profile basics
+- Milestone 2: career paths, assessment, matching, selected career persistence
+- Milestone 3: course catalog, RAG-style recommendations, saved courses
+- Milestone 4: adaptive learning paths, phase roadmap, next best course, update history
 
 ## Install
 
@@ -16,10 +19,11 @@ copy .env.example .env
 
 ## Run
 
-Start MongoDB first, seed careers, then run the API:
+Start MongoDB first, seed data, then run the API:
 
 ```powershell
 python -m app.db.seed_data
+python -m app.db.seed_courses
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -28,25 +32,27 @@ Open:
 - `http://localhost:8000/health`
 - `http://localhost:8000/docs`
 
-## Endpoints
+## Milestone 3 Endpoints
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /auth/me`
-- `POST /auth/logout`
-- `GET /users/me`
-- `PUT /users/me`
-- `GET /profiles/me`
-- `PUT /profiles/me`
-- `GET /careers`
-- `GET /careers/{career_id}`
-- `GET /careers/slug/{slug}`
-- `POST /assessments/submit`
-- `GET /assessments/me`
-- `GET /assessments/history`
-- `GET /matches/me`
-- `POST /matches/select-career`
-- `GET /health`
+- `GET /courses`
+- `GET /courses/{course_id}`
+- `GET /courses/career/{career_path_id}`
+- `GET /courses/skills/{skill_name}`
+- `POST /recommendations/generate`
+- `GET /recommendations/me`
+- `GET /recommendations/history`
+- `POST /recommendations/save-course`
+- `GET /recommendations/saved-courses`
+- `DELETE /recommendations/saved-courses/{course_id}`
+- `POST /learning-paths/generate`
+- `GET /learning-paths/me`
+- `GET /learning-paths/{learning_path_id}`
+- `PATCH /learning-paths/course/{course_id}/start`
+- `PATCH /learning-paths/course/{course_id}/complete`
+- `PATCH /learning-paths/phase/{phase_id}/complete`
+- `GET /learning-paths/next-course`
+- `POST /learning-paths/recalculate`
+- `GET /learning-paths/updates`
 
 ## Collections
 
@@ -55,10 +61,8 @@ Open:
 - `career_paths`
 - `career_assessments`
 - `career_matches`
-
-Indexes are created on startup:
-
-- Unique index on `users.email`
-- Index on `user_profiles.user_id`
-- Unique index on `career_paths.slug`
-- Indexes on career title, active flag, user assessment history, and match lookup fields
+- `courses`
+- `course_recommendations`
+- `saved_courses`
+- `adaptive_learning_paths`
+- `learning_path_updates`

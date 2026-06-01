@@ -15,7 +15,7 @@ class UserResponse(BaseModel):
     updated_at: datetime
     last_login: datetime | None = None
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
 class UserUpdate(BaseModel):

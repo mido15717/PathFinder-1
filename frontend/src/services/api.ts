@@ -5,7 +5,10 @@ export const API_USER_KEY = "PATHFINDER_AUTH_USER";
 
 const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
 
-export const API_BASE_URL = env?.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// Web development uses localhost. For testing on a physical mobile device,
+// replace localhost with your computer's IPv4 address, for example:
+// EXPO_PUBLIC_API_BASE_URL=http://192.168.1.25:8000
+export const API_BASE_URL = (env?.EXPO_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/, "");
 
 type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -36,11 +39,16 @@ export async function apiRequest<T>(endpoint: string, options: ApiOptions = {}):
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body)
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    });
+  } catch (error) {
+    throw new Error("Cannot connect to backend server. Please make sure the backend is running on port 8000.");
+  }
 
   const raw = await response.text();
   const payload = raw ? JSON.parse(raw) : null;
@@ -52,4 +60,3 @@ export async function apiRequest<T>(endpoint: string, options: ApiOptions = {}):
 
   return payload as T;
 }
-

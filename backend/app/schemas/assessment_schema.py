@@ -13,7 +13,7 @@ class AssessmentSubmitRequest(BaseModel):
     current_skills: list[str] = Field(default_factory=list)
     career_goal: str = Field(min_length=2, max_length=120)
     learning_style: str = Field(min_length=2, max_length=80)
-    weekly_available_hours: int = Field(ge=1, le=80)
+    weekly_available_hours: int = Field(ge=0, le=80)
     preferred_work_type: str = Field(min_length=2, max_length=120)
     target_deadline_months: int | None = Field(default=None, ge=0, le=60)
     personality_traits: list[str] = Field(default_factory=list)
@@ -37,7 +37,7 @@ class AssessmentResponse(BaseModel):
     completed_at: datetime
     created_at: datetime
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
 class AssessmentSubmitResponse(BaseModel):

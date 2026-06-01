@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import settings
 from app.db.indexes import create_indexes
 from app.models.career_model import create_career_document
-from app.models.user_model import utc_now
+from app.models.base_model import utc_now
 
 CAREER_PATHS: list[dict[str, Any]] = [
     {

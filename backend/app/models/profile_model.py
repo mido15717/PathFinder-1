@@ -1,10 +1,9 @@
 from bson import ObjectId
 
-from app.models.user_model import utc_now
+from app.models.base_model import base_timestamps
 
 
 def create_profile_document(user_id: ObjectId) -> dict:
-    now = utc_now()
     return {
         "user_id": user_id,
         "university": "",
@@ -25,6 +24,5 @@ def create_profile_document(user_id: ObjectId) -> dict:
         "current_skills": [],
         "selected_career_path_id": None,
         "selected_career_title": "",
-        "created_at": now,
-        "updated_at": now,
+        **base_timestamps(),
     }

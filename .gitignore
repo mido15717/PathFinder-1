@@ -3,12 +3,18 @@ node_modules/
 frontend/node_modules/
 
 # Expo
+.expo/
 frontend/.expo/
+dist/
+build/
 frontend/dist/
+frontend/build/
 
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
+.venv/
 backend/.venv/
 .pytest_cache/
 
@@ -19,6 +25,14 @@ frontend/.env
 
 # Logs
 *.log
+logs/
+backend/logs/
+frontend/logs/
+.codex_tmp/
+*.zip
+
+# Repository metadata should not be included in exported archives
+.git/
 node_modules/ 
 frontend/node_modules/ 
 backend/.venv/ 

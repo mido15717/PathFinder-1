@@ -4,7 +4,7 @@ from bson import ObjectId
 from fastapi import HTTPException, status
 
 from app.db.mongodb import get_database
-from app.models.user_model import utc_now
+from app.models.base_model import utc_now
 from app.utils.object_id import serialize_document, to_object_id
 
 

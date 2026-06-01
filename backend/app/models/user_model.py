@@ -1,9 +1,6 @@
-from datetime import datetime, timezone
 from typing import Literal
 
-
-def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+from app.models.base_model import base_timestamps, utc_now
 
 
 def create_user_document(
@@ -12,7 +9,6 @@ def create_user_document(
     password_hash: str,
     role: Literal["student", "admin"] = "student",
 ) -> dict:
-    now = utc_now()
     return {
         "full_name": full_name,
         "email": email,
@@ -20,8 +16,6 @@ def create_user_document(
         "role": role,
         "is_active": True,
         "is_verified": False,
-        "created_at": now,
-        "updated_at": now,
+        **base_timestamps(),
         "last_login": None,
     }
-

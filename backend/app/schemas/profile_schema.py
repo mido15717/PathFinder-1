@@ -18,7 +18,7 @@ class ProfileResponse(BaseModel):
     linkedin_url: str = ""
     portfolio_url: str = ""
     preferred_language: str = "English"
-    weekly_available_hours: int = 8
+    weekly_available_hours: int = Field(default=8, ge=0)
     preferred_learning_style: str = "mixed"
     career_goal: str = ""
     current_skills: list[str] = Field(default_factory=list)
@@ -27,7 +27,7 @@ class ProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
 class ProfileUpdate(BaseModel):
@@ -43,7 +43,7 @@ class ProfileUpdate(BaseModel):
     linkedin_url: HttpUrl | str | None = None
     portfolio_url: HttpUrl | str | None = None
     preferred_language: str | None = Field(default=None, max_length=40)
-    weekly_available_hours: int | None = Field(default=None, ge=1, le=80)
+    weekly_available_hours: int | None = Field(default=None, ge=0, le=80)
     preferred_learning_style: str | None = Field(default=None, max_length=40)
     career_goal: str | None = Field(default=None, max_length=160)
     current_skills: list[str] | None = None
